@@ -64,6 +64,7 @@ class HumanObstaclePublisher():
       obst = ObstacleMsg()
       obst.header.frame_id='map'
       obst.id = id
+      obst.radius = 0.3
       obst.polygon.points = [Point32(x=ppl_dict[id][0], y=ppl_dict[id][1])]
       obstacle_msg.obstacles.append(obst)
     for obstacle in obstacle_msg.obstacles:
@@ -81,9 +82,9 @@ class HumanObstaclePublisher():
 if __name__ == '__main__': 
   try:
     rospy.init_node("test_obstacle_msg")
-    path = '/home/cloudhy/sgan/datasets/raw/all_data/biwi_eth.txt'
+    path = '/home/cloudhy/programs/sgan/datasets/raw/all_data/biwi_eth.txt'
     human_obstacle_publisher = HumanObstaclePublisher(path)
-    r = rospy.Rate(25)
+    r = rospy.Rate(10)
     t = 1330
     while not rospy.is_shutdown():
       human_obstacle_publisher.publish_obstacle_msg(t)
