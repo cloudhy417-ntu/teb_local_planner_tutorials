@@ -11,10 +11,10 @@ TebLocalPlannerROS:
  max_global_plan_lookahead_dist: 3.0
  global_plan_viapoint_sep: -1
  global_plan_prune_distance: 1
- exact_arc_length: False
+ exact_arc_length: True
  feasibility_check_no_poses: 5
  publish_feedback: False
-    
+ visualize_with_time_as_z_axis_scale: 0.1
  # Robot
          
  max_vel_x: 0.4
@@ -41,9 +41,11 @@ TebLocalPlannerROS:
  min_obstacle_dist: 0.25 # This value must also include our robot radius, since footprint_model is set to "point".
  inflation_dist: 0.6
  include_costmap_obstacles: True
+ include_human_obstacles: True
+ include_dynamic_obstacles: True
  costmap_obstacles_behind_robot_dist: 1.0
  obstacle_poses_affected: 15
- costmap_converter_plugin: ""
+ costmap_converter_plugin: "costmap_converter::CostmapToLinesDBSRANSAC"
  costmap_converter_spin_thread: True
  costmap_converter_rate: 5
 
@@ -94,7 +96,7 @@ TebLocalPlannerROS:
  delete_detours_backwards: True
  max_ratio_detours_duration_best_duration: 3.0
  visualize_hc_graph: False
- visualize_with_time_as_z_axis_scale: False
+ visualize_with_time_as_z_axis_scale: 0.1
 
 # Recovery
  
