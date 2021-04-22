@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import sys
+sys.path.append('/home/cloudhy/programs/sgan')
 import argparse
 import os
 import torch
@@ -12,9 +14,8 @@ from sgan.models import TrajectoryGenerator
 from sgan.losses import displacement_error, final_displacement_error
 from sgan.utils import relative_to_abs, get_dset_path
 
-import sys
 print (sys.version)
-sys.path.insert(0,'/home/robot/python3_ws/devel/lib/python3/dist-packages')
+sys.path.insert(0,'/home/cloudhy/python3_ws/devel/lib/python3/dist-packages')
 import rospy, math, tf
 from costmap_converter.msg import ObstacleArrayMsg, ObstacleMsg
 from std_msgs.msg import Header
@@ -52,7 +53,7 @@ def get_generator(checkpoint):
     return generator
 
 class Traj_pred:
-    def __init__(self, model_path, max_obj = 10, max_obs_len = 150):
+    def __init__(self, model_path, max_obj = 1000, max_obs_len = 1000):
         self.prediction_pub = rospy.Publisher('/move_base/TebLocalPlannerROS/humanObstacles', ObstacleArrayMsg, queue_size=10)
         self.history_visualize_pub = rospy.Publisher('previous_path', Path, queue_size=100)
         self.prediction_visualize_pub = rospy.Publisher('predicted_path', Path, queue_size=100)
@@ -63,27 +64,18 @@ class Traj_pred:
         self.generator = get_generator(checkpoint)
         self.trans_matrix = None
         self.lastUpdate = rospy.get_time()-1.0
+        print('finished initialize')
     def obs_traj_callback(self, data):
-        if len(data.objects)==0:
+        if len(data.obstacles)==0:
             return
         if (rospy.get_time()-self.lastUpdate < 0.4):
             return
-        try:
-            (trans,rot) = self.tf_listener.lookupTransform('/map', 'zed2_left_camera_frame', rospy.Time(0))
-            self.trans_matrix = np.array(quaternion_matrix(rot))
-            self.trans_matrix[0,3] = trans[0]
-            self.trans_matrix[1,3] = trans[1]
-            self.trans_matrix[2,3] = trans[2]
-        except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-            if self.trans_matrix is None:
-                return
         # store people's position by dict, using label_id as key
-        objs = {obj.label_id:np.dot(self.trans_matrix,np.array([obj.position[0],obj.position[1],0,1]))[:2]  for obj in data.objects}
+        objs = {obj.id:np.array([obj.polygon.points[0].x, obj.polygon.points[0].y])  for obj in data.obstacles}
         # store recorded time
-        objs['time'] = data.header.stamp
+        # objs['time'] = data.header.stamp
         # append the dict into history
         self.history.append(objs)
-        
         # get previous observed position of the current people set
         obs_traj = []
         obs_time = []
@@ -91,13 +83,13 @@ class Traj_pred:
         for i in range(len(self.history)-8,len(self.history)):# 10: previous trajectory time steps
             try:
                 obs = [self.history[i][key] for key in obj_set] #observed point for one time step
-                obs_traj.append(obs[:-1])
+                obs_traj.append(obs)
                 obs_time.append(obs['time'])
             except:
                 pass
         obs_traj = np.array(obs_traj, dtype=float) # shape:(timestep, num_of_ppl, xy)
         # visualize previous trajectory
-        human_previous_path_deque = deque(maxlen=20)
+        human_previous_path_deque = deque(maxlen=1000)
         for i in range(0, obs_traj.shape[1]):# iterate through ppl
             human_previous_path = Path()
             human_previous_path.header.seq = i
@@ -108,6 +100,7 @@ class Traj_pred:
             human_previous_path_deque.append(human_previous_path)
         for path in human_previous_path_deque:
             self.history_visualize_pub.publish(path)
+
         obs_traj *= 10
         # prepare data in social gan data format (for inference)
         obs_traj_rel = np.diff(obs_traj, axis=0)
@@ -149,17 +142,17 @@ class Traj_pred:
                 human_obstacle.polygon.points[0].y = pred_traj_fake[j,i,1]
                 human_obstacle.polygon.points[0].z = 1/15 #delta T
                 human_obstacle_msg.obstacles.append(human_obstacle)
-        self.prediction_pub.publish(human_obstacle_msg)
+        # self.prediction_pub.publish(human_obstacle_msg)
         for path in human_predicted_path_deque:
             self.prediction_visualize_pub.publish(path)
     
 def start_pred():
     rospy.init_node('zed_traj_pred', anonymous=True)
     rospack = rospkg.RosPack()
-    package_path = rospack.get_path('zed_traj_pred')
+    package_path = rospack.get_path('teb_local_planner_tutorials')
     model_path = os.path.join(package_path,'models/sgan-models/hotel_8_model.pt')
     traj_pred = Traj_pred(model_path=model_path)
-    rospy.Subscriber("/zed2/zed_node/obj_det/objects", ObjectsStamped, traj_pred.obs_traj_callback)
+    rospy.Subscriber('/move_base/TebLocalPlannerROS/obstacles', ObstacleArrayMsg, traj_pred.obs_traj_callback)
     rospy.spin()
 
 if __name__ == '__main__':

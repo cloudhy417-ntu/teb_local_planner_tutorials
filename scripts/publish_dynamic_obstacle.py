@@ -9,7 +9,7 @@ from tf.transformations import quaternion_from_euler
 
 
 def publish_obstacle_msg():
-  pub = rospy.Publisher('/test_optim_node/obstacles', ObstacleArrayMsg, queue_size=1)
+  pub = rospy.Publisher('/move_base/TebLocalPlannerROS/obstacles', ObstacleArrayMsg, queue_size=1)
   #pub = rospy.Publisher('/p3dx/move_base/TebLocalPlannerROS/obstacles', ObstacleArrayMsg, queue_size=1)
   rospy.init_node("test_obstacle_msg")
 
@@ -29,6 +29,7 @@ def publish_obstacle_msg():
   obstacle_msg.obstacles[0].polygon.points[0].x = -1.5
   obstacle_msg.obstacles[0].polygon.points[0].y = 0
   obstacle_msg.obstacles[0].polygon.points[0].z = 0
+  obstacle_msg.obstacles[0].radius = 0.5
 
   yaw = math.atan2(vel_y, vel_x)
   q = tf.transformations.quaternion_from_euler(0,0,yaw)

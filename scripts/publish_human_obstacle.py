@@ -37,11 +37,12 @@ def get_ppl_loc(dataframe,time):
         x_0 = dataframe.loc[[time_0]].loc[dataframe.loc[[time_0]].id==id].x.values[0]
         x_1 = dataframe.loc[[time_1]].loc[dataframe.loc[[time_1]].id==id].x.values[0]
         x = x_1*(time-time_0)/10 + x_0*(10-(time-time_0))/10
-        
+        vx = x_1 - x_0
         y_0 = dataframe.loc[[time_0]].loc[dataframe.loc[[time_0]].id==id].y.values[0]
         y_1 = dataframe.loc[[time_1]].loc[dataframe.loc[[time_1]].id==id].y.values[0]
         y = y_1*(time-time_0)/10 + y_0*(10-(time-time_0))/10
-        return_dict[id] = (x,y)
+        vy = y_1 - y_0
+        return_dict[id] = (x,y, vx,vy)
     return return_dict
 class HumanObstaclePublisher():
   def __init__(self, path):
@@ -64,33 +65,40 @@ class HumanObstaclePublisher():
       obst = ObstacleMsg()
       obst.header.frame_id='map'
       obst.id = id
-      obst.radius = 0.3
+      obst.radius = 0.6
       obst.polygon.points = [Point32(x=ppl_dict[id][0], y=ppl_dict[id][1])]
+      
+      obst.velocities.twist.linear.x = ppl_dict[id][2]
+      obst.velocities.twist.linear.y = ppl_dict[id][3]
+      
       obstacle_msg.obstacles.append(obst)
     for obstacle in obstacle_msg.obstacles:
       marker = Marker(
             type=Marker.SPHERE,
             id=obstacle.id,
-            pose=Pose(Point(obstacle.polygon.points[0].x, obstacle.polygon.points[0].y, 0.5), Quaternion(0, 0, 0, 1)),
+            pose=Pose(Point(obstacle.polygon.points[0].x, obstacle.polygon.points[0].y, 0.0), Quaternion(0, 0, 0, 1)),
             scale=Vector3(0.6, 0.6, 0.6),
             header=Header(frame_id='map'),
             color=ColorRGBA(0.0, 1.0, 0.0, 0.8))
-      marker.lifetime = rospy.Duration.from_sec(0.15)
+      marker.lifetime = rospy.Duration.from_sec(0.5)
       self.marker_publisher.publish(marker)
       self.obstacle_publisher.publish(obstacle_msg)
 
 if __name__ == '__main__': 
   try:
     rospy.init_node("test_obstacle_msg")
-    path = '/home/cloudhy/programs/sgan/datasets/raw/all_data/biwi_eth.txt'
+    path = '/home/cloudhy/programs/sgan/datasets/eth/test/biwi_eth.txt'
     human_obstacle_publisher = HumanObstaclePublisher(path)
     r = rospy.Rate(10)
     t = 1330
     while not rospy.is_shutdown():
       human_obstacle_publisher.publish_obstacle_msg(t)
       t += 1
-      print(t)
+      # if t>4400:
+      #   t = 4200
+      # print(t)
       r.sleep()
   except rospy.ROSInterruptException:
+    print("STOP")
     pass
 
