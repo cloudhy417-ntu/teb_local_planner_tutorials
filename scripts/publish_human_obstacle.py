@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # Author: franz.albers@tu-dortmund.de
-
+import sys
 import rospy, math, tf
 import numpy as np
 import pandas as pd
@@ -87,18 +87,19 @@ class HumanObstaclePublisher():
 if __name__ == '__main__': 
   try:
     rospy.init_node("test_obstacle_msg")
-    path = '/home/cloudhy/programs/sgan/datasets/eth/test/biwi_eth.txt'
+    path = '/home/cloudhy/sgan/datasets/eth/test/biwi_eth.txt'
     human_obstacle_publisher = HumanObstaclePublisher(path)
-    r = rospy.Rate(10)
-    t = 1330
+    r = rospy.Rate(100)
+    t = 780
     while not rospy.is_shutdown():
       human_obstacle_publisher.publish_obstacle_msg(t)
+      print '\rTimeStep: {:05d}'.format(t),
+      sys.stdout.flush()
       t += 1
-      # if t>4400:
-      #   t = 4200
-      # print(t)
+      if t>12380:
+        rospy.signal_shutdown('finished playback')
       r.sleep()
   except rospy.ROSInterruptException:
-    print("STOP")
+    print("finished playback")
     pass
 
