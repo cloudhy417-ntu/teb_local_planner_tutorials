@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from costmap_converter.msg import ObstacleArrayMsg, ObstacleMsg
 from std_msgs.msg import Header, ColorRGBA
-from geometry_msgs.msg import PolygonStamped, Point32, QuaternionStamped, Quaternion, TwistWithCovariance, Pose, Point, Vector3
+from geometry_msgs.msg import PoseWithCovarianceStamped, PolygonStamped, Point32, QuaternionStamped, Quaternion, TwistWithCovariance, Pose, Point, Vector3
 from tf.transformations import quaternion_from_euler
 from visualization_msgs.msg import Marker
 
@@ -59,6 +59,20 @@ class HumanObstaclePublisher():
     self.obstacle_publisher = rospy.Publisher('/move_base/TebLocalPlannerROS/obstacles', ObstacleArrayMsg, queue_size=1)
     self.marker_publisher = rospy.Publisher('visualization_marker', Marker, queue_size=100)
     self.time = 780
+    rospy.wait_for_service('/reset_positions')
+    self.stage_reset_pos = rospy.ServiceProxy('/reset_positions', Empty)
+    self.amcl_reset_pos = rospy.Publisher('/initialpose', PoseWithCovarianceStamped, queue_size=10)
+  def reset_pos(self):
+    self.stage_reset_pos.call()
+    initial_pose = PoseWithCovarianceStamped()
+    initial_pose.header.frame_id = '/map'
+    initial_pose.pose.pose.position.x = -2
+    initial_pose.pose.pose.position.y = -3
+    q = quaternion_from_euler(0,0,0)
+    initial_pose.pose.pose.orientation.z = q[2]
+    initial_pose.pose.pose.orientation.w = q[3]
+    self.amcl_reset_pos.publish(initial_pose)
+    rospy.sleep(1.)
   def publish_obstacle_msg(self, t):
     obstacle_msg = ObstacleArrayMsg() 
     obstacle_msg.header.frame_id = '/map'
@@ -72,8 +86,8 @@ class HumanObstaclePublisher():
       obst.radius = 0.6
       obst.polygon.points = [Point32(x=ppl_dict[id][0], y=ppl_dict[id][1])]
       
-      obst.velocities.twist.linear.x = ppl_dict[id][2]*1.0
-      obst.velocities.twist.linear.y = ppl_dict[id][3]*1.0
+      obst.velocities.twist.linear.x = ppl_dict[id][2]*2.0
+      obst.velocities.twist.linear.y = ppl_dict[id][3]*2.0
       
       obstacle_msg.obstacles.append(obst)
     for obstacle in obstacle_msg.obstacles:
@@ -103,30 +117,23 @@ if __name__ == '__main__':
     orientation = quaternion_from_euler(0,0,1.57)
     goal.target_pose.pose.orientation.z = orientation[2]
     goal.target_pose.pose.orientation.w = orientation[3]
-    # client.send_goal(goal)
+    client.send_goal(goal)
     r = rospy.Rate(10)
-    t = 4228
-    # t = 780
+    t0 = 2460
+    t = t0
     while not rospy.is_shutdown():
       human_obstacle_publisher.publish_obstacle_msg(t)
       print '\rTimeStep: {:05d}'.format(t),
       sys.stdout.flush()
       t += 1
-      if t==4236:
+      if t > t0 + 150:
+        human_obstacle_publisher.reset_pos()
+        t0 += 30
         client.send_goal(goal)
-      if t>4400:
-        human_obstacle_publisher.publish_obstacle_msg(15000)
-        goal.target_pose.pose.position.x = -2
-        goal.target_pose.pose.position.y = -3
-        t = 4236
-        client.send_goal(goal)
-        client.wait_for_result()
-        goal.target_pose.header.stamp = rospy.Time.now()
-        goal.target_pose.pose.position.x = 0
-        goal.target_pose.pose.position.y = 3
-        client.send_goal(goal)
+        t = t0
       r.sleep()
   except rospy.ROSInterruptException:
     print("finished playback")
     pass
+# demo scenerio 4236
 

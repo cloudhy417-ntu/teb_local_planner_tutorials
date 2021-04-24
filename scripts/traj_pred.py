@@ -119,7 +119,7 @@ class Traj_pred:
         pred_traj_fake/=10
         start = pred_traj_fake[:1,:,:].clone()
         pred_traj_fake -= start
-        pred_traj_fake *= 2.0
+        pred_traj_fake *= 2.5
         pred_traj_fake += start
         # make predicted data in ROS format to publish to local planner and visualize
         human_obstacle_msg = ObstacleArrayMsg() 
