@@ -100,7 +100,8 @@ class Traj_pred:
             human_previous_path_deque.append(human_previous_path)
         for path in human_previous_path_deque:
             self.history_visualize_pub.publish(path)
-
+        if obs_traj.shape[0]!=8:
+            return
         obs_traj *= 10
         # prepare data in social gan data format (for inference)
         obs_traj_rel = np.diff(obs_traj, axis=0)
@@ -116,6 +117,10 @@ class Traj_pred:
         result = self.generator(obs_traj, obs_traj_rel, start_end)
         pred_traj_fake = relative_to_abs(result, obs_traj[-1])# shape:[10, num of ppl, 2(x,y)]
         pred_traj_fake/=10
+        start = pred_traj_fake[:1,:,:].clone()
+        pred_traj_fake -= start
+        pred_traj_fake *= 2.0
+        pred_traj_fake += start
         # make predicted data in ROS format to publish to local planner and visualize
         human_obstacle_msg = ObstacleArrayMsg() 
         human_obstacle_msg.header.stamp = rospy.Time.now()
@@ -142,7 +147,7 @@ class Traj_pred:
                 human_obstacle.polygon.points[0].y = pred_traj_fake[j,i,1]
                 human_obstacle.polygon.points[0].z = 1/15 #delta T
                 human_obstacle_msg.obstacles.append(human_obstacle)
-        # self.prediction_pub.publish(human_obstacle_msg)
+        self.prediction_pub.publish(human_obstacle_msg)
         for path in human_predicted_path_deque:
             self.prediction_visualize_pub.publish(path)
     
@@ -150,7 +155,7 @@ def start_pred():
     rospy.init_node('zed_traj_pred', anonymous=True)
     rospack = rospkg.RosPack()
     package_path = rospack.get_path('teb_local_planner_tutorials')
-    model_path = os.path.join(package_path,'models/sgan-models/hotel_8_model.pt')
+    model_path = os.path.join(package_path,'models/sgan-models/eth_8_model.pt')
     traj_pred = Traj_pred(model_path=model_path)
     rospy.Subscriber('/move_base/TebLocalPlannerROS/obstacles', ObstacleArrayMsg, traj_pred.obs_traj_callback)
     rospy.spin()
