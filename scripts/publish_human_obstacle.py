@@ -11,6 +11,10 @@ from geometry_msgs.msg import PolygonStamped, Point32, QuaternionStamped, Quater
 from tf.transformations import quaternion_from_euler
 from visualization_msgs.msg import Marker
 
+import actionlib
+from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
+from std_srvs.srv import Empty
+
 def read_file(_path, delim='\t'):
     data = []
     if delim == 'tab':
@@ -68,8 +72,8 @@ class HumanObstaclePublisher():
       obst.radius = 0.6
       obst.polygon.points = [Point32(x=ppl_dict[id][0], y=ppl_dict[id][1])]
       
-      obst.velocities.twist.linear.x = ppl_dict[id][2]
-      obst.velocities.twist.linear.y = ppl_dict[id][3]
+      obst.velocities.twist.linear.x = ppl_dict[id][2]*1.0
+      obst.velocities.twist.linear.y = ppl_dict[id][3]*1.0
       
       obstacle_msg.obstacles.append(obst)
     for obstacle in obstacle_msg.obstacles:
@@ -80,24 +84,47 @@ class HumanObstaclePublisher():
             scale=Vector3(0.6, 0.6, 0.6),
             header=Header(frame_id='map'),
             color=ColorRGBA(0.0, 1.0, 0.0, 0.8))
-      marker.lifetime = rospy.Duration.from_sec(0.5)
+      marker.lifetime = rospy.Duration.from_sec(1.1)
       self.marker_publisher.publish(marker)
-      self.obstacle_publisher.publish(obstacle_msg)
+    self.obstacle_publisher.publish(obstacle_msg)
 
 if __name__ == '__main__': 
   try:
     rospy.init_node("test_obstacle_msg")
-    path = '/home/cloudhy/sgan/datasets/eth/test/biwi_eth.txt'
+    client = actionlib.SimpleActionClient('move_base',MoveBaseAction)
+    client.wait_for_server()
+    path = '/home/cloudhy/programs/sgan/datasets/eth/test/biwi_eth.txt'
     human_obstacle_publisher = HumanObstaclePublisher(path)
-    r = rospy.Rate(100)
-    t = 780
+    goal = MoveBaseGoal()
+    goal.target_pose.header.frame_id = "map"
+    goal.target_pose.header.stamp = rospy.Time.now()
+    goal.target_pose.pose.position.x = 0
+    goal.target_pose.pose.position.y = 3
+    orientation = quaternion_from_euler(0,0,1.57)
+    goal.target_pose.pose.orientation.z = orientation[2]
+    goal.target_pose.pose.orientation.w = orientation[3]
+    # client.send_goal(goal)
+    r = rospy.Rate(10)
+    t = 4228
+    # t = 780
     while not rospy.is_shutdown():
       human_obstacle_publisher.publish_obstacle_msg(t)
       print '\rTimeStep: {:05d}'.format(t),
       sys.stdout.flush()
       t += 1
-      if t>12380:
-        rospy.signal_shutdown('finished playback')
+      if t==4236:
+        client.send_goal(goal)
+      if t>4400:
+        human_obstacle_publisher.publish_obstacle_msg(15000)
+        goal.target_pose.pose.position.x = -2
+        goal.target_pose.pose.position.y = -3
+        t = 4236
+        client.send_goal(goal)
+        client.wait_for_result()
+        goal.target_pose.header.stamp = rospy.Time.now()
+        goal.target_pose.pose.position.x = 0
+        goal.target_pose.pose.position.y = 3
+        client.send_goal(goal)
       r.sleep()
   except rospy.ROSInterruptException:
     print("finished playback")
