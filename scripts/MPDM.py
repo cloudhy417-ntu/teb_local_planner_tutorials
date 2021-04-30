@@ -1,10 +1,19 @@
+#!/usr/bin/env python3
 import rospy
 import math
 import numpy as np
+from sklearn.cluster import DBSCAN
 from nav_msgs.srv import GetPlan
 from nav_msgs.msg import Path
+from std_msgs.msg import Header, ColorRGBA
+from geometry_msgs.msg import Vector3, Point32
+from costmap_converter.msg import ObstacleArrayMsg, ObstacleMsg
+import sys
+print (sys.version)
+sys.path.insert(0, '/home/chy/python3_ws/devel/lib/python3/dist-packages')
 from tf.transformations import quaternion_from_euler
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
+from visualization_msgs.msg import Marker, MarkerArray
 PI = math.pi
 map_dict = {1:(0,-PI), 2:(PI/4, -3*PI/4), 3:(PI/2, -PI/2), 4:(3*PI/4, -PI/4)}
 class MPDM:
@@ -15,20 +24,71 @@ class MPDM:
         self.centerY = centerY
         rospy.wait_for_service('/move_base/GlobalPlanner/make_plan')
         self.planner = rospy.ServiceProxy('/move_base/GlobalPlanner/make_plan', GetPlan)
+
+        self.move_base_client = actionlib.SimpleActionClient('move_base',MoveBaseAction)
+        self.move_base_client.wait_for_server()
+        self.goal_pub = rospy.Publisher('goal', PoseStamped, queue_size=100)
+        
+        self.human_sub = rospy.Subscriber('/move_base/TebLocalPlannerROS/obstacles', ObstacleArrayMsg, self.humanObstacleCallback)
+        self.cluster_visualizer = rospy.Publisher('/group_cluster', MarkerArray, queue_size = 1)
+        self.humans = ObstacleArrayMsg()
         self.robot_pose_sub = rospy.Subscriber('/robot_pose', Pose, self.update_pose)
         self.robot_pose = Pose()
         self.plan_visualizer = rospy.Publisher('/plan', Path, queue_size=1)
+    def humanObstacleCallback(self, data):
+        self.humans = data.obstacles
+        markerArray = MarkerArray()
+        humanIDs = []
+        humanArr = []
+        radius = 0.6
+        for human in self.humans:
+            x = human.polygon.points[0].x
+            y = human.polygon.points[0].y
+            velx = human.velocities.twist.linear.x
+            vely = human.velocities.twist.linear.y
+            vel = math.sqrt(math.pow(velx,2) + math.pow(vely,2))
+            if vel != 0:
+                humanArr.append([x,y,velx/vel, vely/vel])
+            else:
+                humanArr.append([x,y,0, 0])
+            humanIDs.append(human.id)
+        humanArr = np.array(humanArr)
+        clustering=DBSCAN(eps=1.2,min_samples=2).fit(humanArr)
+        group_id = 0
+        while group_id in clustering.labels_:
+            indexes = np.where(clustering.labels_ == group_id)
+            group_positions = humanArr[indexes]
+            position = np.average(group_positions, axis=0)
+            Xrange = group_positions[:,0].max() - group_positions[:,0].min() + 1
+            Yrange = group_positions[:,1].max() - group_positions[:,1].min() + 1
+            marker = Marker(
+                    type=Marker.SPHERE,
+                    id=group_id,
+                    pose=Pose(Point(position[0], position[1], 0.0), Quaternion(0, 0, 0, 1)),
+                    scale=Vector3(Xrange, Yrange, 0.1),
+                    header=Header(frame_id='map'),
+                    color=ColorRGBA(1.0, 0.0, 0.0, 0.3))
+            marker.lifetime = rospy.Duration.from_sec(0.5)
+            group_id += 1
+            markerArray.markers.append(marker)
+        self.cluster_visualizer.publish(markerArray)
     def update_pose(self, pose):
         self.robot_pose = pose
     def make_plan(self, goal):
+        # make a virtual plan without consider dynamic obstacle
+        # TODO: clear dynamic obstacle
         tolerance = 0.1
         start = PoseStamped()
         start.header.frame_id = 'map'
         start.pose = self.robot_pose
+        # global plan scoring
         path = self.planner.call(start,goal,tolerance)
         path_score = self.evaluate_path(path.plan)
-        print(path_score)
+        # visualize for debugginh
+        # print(path_score)
         self.plan_visualizer.publish(path.plan)
+        # group clustering
+
     def score(self, map_dir, path_dir):
         map_dir_angle = map_dict[map_dir]
         return max(math.cos(path_dir-map_dir_angle[0]), math.cos(path_dir-map_dir_angle[1]))
@@ -48,7 +108,7 @@ class MPDM:
         return total_score/(len(path.poses)-1)
 if __name__=='__main__':
     rospy.init_node('mpdm', anonymous=True)
-    flowmap = np.load('flowmap_direction_down_sampled.npy')
+    flowmap = np.load('/home/chy/catkin_ws/src/teb_local_planner_tutorials/scripts/flowmap_direction_down_sampled.npy')
     resolution = 0.2
     centX = 32.5
     centY = 22.5
