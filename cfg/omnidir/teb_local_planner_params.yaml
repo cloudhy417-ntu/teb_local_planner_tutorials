@@ -8,7 +8,7 @@ TebLocalPlannerROS:
  max_samples: 500
  global_plan_overwrite_orientation: True
  allow_init_with_backwards_motion: False
- max_global_plan_lookahead_dist: 3.0
+ max_global_plan_lookahead_dist: 0
  global_plan_viapoint_sep: -1
  global_plan_prune_distance: 1
  exact_arc_length: True
@@ -38,7 +38,7 @@ TebLocalPlannerROS:
     
  # Obstacles
     
- min_obstacle_dist: 0.25 # This value must also include our robot radius, since footprint_model is set to "point".
+ min_obstacle_dist: 0.3 # This value must also include our robot radius, since footprint_model is set to "point".
  inflation_dist: 0.6
  include_costmap_obstacles: True
  include_human_obstacles: True
@@ -47,7 +47,7 @@ TebLocalPlannerROS:
  obstacle_poses_affected: 15
  costmap_converter_plugin: "costmap_converter::CostmapToLinesDBSRANSAC"
  costmap_converter_spin_thread: True
- costmap_converter_rate: 5
+ costmap_converter_rate: 20
 
  # Optimization
     
@@ -70,9 +70,9 @@ TebLocalPlannerROS:
  weight_shortest_path: 0
  weight_obstacle: 100
  weight_inflation: 0.2
- weight_dynamic_obstacle: 1000
+ weight_dynamic_obstacle: 100
  weight_dynamic_obstacle_inflation: 0.2
- weight_human_obstacle: 1000
+ weight_human_obstacle: 100
  weight_human_obstacle_inflation: 0.2
  weight_viapoint: 1
  weight_adapt_factor: 2
@@ -87,8 +87,8 @@ TebLocalPlannerROS:
  selection_obst_cost_scale: 1.0
  selection_alternative_time_cost: False
  
- roadmap_graph_no_samples: 15
- roadmap_graph_area_width: 5
+ roadmap_graph_no_samples: 20
+ roadmap_graph_area_width: 10
  roadmap_graph_area_length_scale: 1.0
  h_signature_prescaler: 0.5
  h_signature_threshold: 0.1
@@ -98,7 +98,7 @@ TebLocalPlannerROS:
  delete_detours_backwards: True
  max_ratio_detours_duration_best_duration: 3.0
  visualize_hc_graph: False
- visualize_with_time_as_z_axis_scale: 0.1
+ visualize_with_time_as_z_axis_scale: 0.0
 
 # Recovery
  
