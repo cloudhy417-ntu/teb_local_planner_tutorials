@@ -36,13 +36,18 @@ class MPDM:
         
         self.human_sub = rospy.Subscriber('/move_base/TebLocalPlannerROS/obstacles', ObstacleArrayMsg, self.humanObstacleCallback)
         self.cluster_visualizer = rospy.Publisher('/group_cluster', MarkerArray, queue_size = 1)
-        self.human_group_publisher = rospy.Publisher('/move_base/local_costmap/humangrouplayer/human_group', PolygonArray, queue_size=1)
+        self.local_human_group_publisher = rospy.Publisher('/move_base/local_costmap/humangrouplayer/human_group', PolygonArray, queue_size=1)
+        self.global_human_group_publisher = rospy.Publisher('/move_base/global_costmap/humangrouplayer/human_group', PolygonArray, queue_size=1)
         self.humans = ObstacleArrayMsg()
         self.robot_pose_sub = rospy.Subscriber('/robot_pose', Pose, self.update_pose)
         self.robot_pose = Pose()
         self.plan_visualizer = rospy.Publisher('/plan', Path, queue_size=1)
     def humanObstacleCallback(self, data):
         self.humans = data.obstacles
+        group_polygons = PolygonArray()
+        if len(data.obstacles)==0:
+            self.global_human_group_publisher.publish(group_polygons)
+            return
         markerArray = MarkerArray()
         humanIDs = []
         humanArr = []
@@ -61,7 +66,7 @@ class MPDM:
         humanArr = np.array(humanArr)
         clustering=DBSCAN(eps=1.2,min_samples=2).fit(humanArr)
         group_id = 0
-        group_polygons = PolygonArray()
+        
         group_polygons.header.frame_id = '/map'
         while group_id in clustering.labels_:
             group_polygon = PolygonStamped()
@@ -86,7 +91,8 @@ class MPDM:
             for position in group_positions:
                 group_polygon.polygon.points.append(Point32(position[0], position[1], 0))
             group_polygons.polygons.append(group_polygon)    
-        self.human_group_publisher.publish(group_polygons)
+        # self.local_human_group_publisher.publish(group_polygons)
+        self.global_human_group_publisher.publish(group_polygons)
         self.cluster_visualizer.publish(markerArray)
     def update_pose(self, pose):
         self.robot_pose = pose
