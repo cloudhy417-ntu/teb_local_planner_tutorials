@@ -6,7 +6,7 @@ import rospy, math, tf
 import numpy as np
 import pandas as pd
 from costmap_converter.msg import ObstacleArrayMsg, ObstacleMsg
-from std_msgs.msg import Header, ColorRGBA
+from std_msgs.msg import Header, ColorRGBA, Int64
 from geometry_msgs.msg import PoseWithCovarianceStamped, PolygonStamped, Point32, QuaternionStamped, Quaternion, TwistWithCovariance, Pose, Point, Vector3
 from tf.transformations import quaternion_from_euler
 from visualization_msgs.msg import Marker
@@ -66,24 +66,26 @@ class HumanObstaclePublisher():
     self.stage_reset_pos.call()
     initial_pose = PoseWithCovarianceStamped()
     initial_pose.header.frame_id = '/map'
-    initial_pose.pose.pose.position.x = -2
-    initial_pose.pose.pose.position.y = -3
+    initial_pose.pose.pose.position.x = -5
+    initial_pose.pose.pose.position.y = -0
     q = quaternion_from_euler(0,0,0)
     initial_pose.pose.pose.orientation.z = q[2]
     initial_pose.pose.pose.orientation.w = q[3]
     self.amcl_reset_pos.publish(initial_pose)
     rospy.sleep(1.)
   def publish_obstacle_msg(self, t):
+    radius = 0.4
     obstacle_msg = ObstacleArrayMsg() 
     obstacle_msg.header.frame_id = '/map'
     ppl_dict = get_ppl_loc(self.dataframe, t)
     if ppl_dict is None:
+      self.obstacle_publisher.publish(obstacle_msg)
       return
     for id in ppl_dict.keys():
       obst = ObstacleMsg()
       obst.header.frame_id='map'
       obst.id = id
-      obst.radius = 0.6
+      obst.radius = radius
       obst.polygon.points = [Point32(x=ppl_dict[id][0], y=ppl_dict[id][1])]
       
       obst.velocities.twist.linear.x = ppl_dict[id][2]*2.0
@@ -95,9 +97,9 @@ class HumanObstaclePublisher():
             type=Marker.SPHERE,
             id=obstacle.id,
             pose=Pose(Point(obstacle.polygon.points[0].x, obstacle.polygon.points[0].y, 0.0), Quaternion(0, 0, 0, 1)),
-            scale=Vector3(0.6, 0.6, 0.6),
+            scale=Vector3(radius, radius, radius),
             header=Header(frame_id='map'),
-            color=ColorRGBA(0.0, 1.0, 0.0, 0.8))
+            color=ColorRGBA(0.0, 1.0, 0.0, 1.0))
       marker.lifetime = rospy.Duration.from_sec(1.1)
       self.marker_publisher.publish(marker)
     self.obstacle_publisher.publish(obstacle_msg)
@@ -105,32 +107,23 @@ class HumanObstaclePublisher():
 if __name__ == '__main__': 
   try:
     rospy.init_node("test_obstacle_msg")
-    client = actionlib.SimpleActionClient('move_base',MoveBaseAction)
-    client.wait_for_server()
-    path = '/home/cloudhy/programs/sgan/datasets/eth/test/biwi_eth.txt'
+    path = '/home/cloudhy/sgan/datasets/eth/test/biwi_eth.txt'
     human_obstacle_publisher = HumanObstaclePublisher(path)
-    goal = MoveBaseGoal()
-    goal.target_pose.header.frame_id = "map"
-    goal.target_pose.header.stamp = rospy.Time.now()
-    goal.target_pose.pose.position.x = 0
-    goal.target_pose.pose.position.y = 3
-    orientation = quaternion_from_euler(0,0,1.57)
-    goal.target_pose.pose.orientation.z = orientation[2]
-    goal.target_pose.pose.orientation.w = orientation[3]
-    client.send_goal(goal)
+    sim_time_publisher = rospy.Publisher('/sim_time', Int64, queue_size=10)
     r = rospy.Rate(10)
-    t0 = 2460
+    t0 = 750
     t = t0
     while not rospy.is_shutdown():
+      # sim_time_publisher.publish(t0)  
       human_obstacle_publisher.publish_obstacle_msg(t)
       print '\rTimeStep: {:05d}'.format(t),
       sys.stdout.flush()
       t += 1
-      if t > t0 + 150:
+      if t > t0 + 210:
         human_obstacle_publisher.reset_pos()
         t0 += 30
-        client.send_goal(goal)
         t = t0
+        sim_time_publisher.publish(t0)
       r.sleep()
   except rospy.ROSInterruptException:
     print("finished playback")
