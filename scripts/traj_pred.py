@@ -18,9 +18,10 @@ print (sys.version)
 sys.path.insert(0,'/home/cloudhy/python3_ws/devel/lib/python3/dist-packages')
 import rospy, math, tf
 from costmap_converter.msg import ObstacleArrayMsg, ObstacleMsg
-from std_msgs.msg import Header
+from std_msgs.msg import Header, ColorRGBA
 from nav_msgs.msg import Path
-from geometry_msgs.msg import PolygonStamped, Point32, QuaternionStamped, Quaternion, TwistWithCovariance, Point, Quaternion, Pose, PoseStamped
+from visualization_msgs.msg import Marker, MarkerArray
+from geometry_msgs.msg import PolygonStamped, Point32, QuaternionStamped, Quaternion, TwistWithCovariance, Point, Quaternion, Pose, PoseStamped, Vector3
 from tf.transformations import quaternion_from_euler, quaternion_matrix
 import rospy
 import rospkg
@@ -55,8 +56,8 @@ def get_generator(checkpoint):
 class Traj_pred:
     def __init__(self, model_path, max_obj = 1000, max_obs_len = 1000):
         self.prediction_pub = rospy.Publisher('/move_base/TebLocalPlannerROS/humanObstacles', ObstacleArrayMsg, queue_size=10)
-        self.history_visualize_pub = rospy.Publisher('previous_path', Path, queue_size=100)
-        self.prediction_visualize_pub = rospy.Publisher('predicted_path', Path, queue_size=100)
+        self.history_visualize_pub = rospy.Publisher('previous_path', MarkerArray, queue_size=100)
+        self.prediction_visualize_pub = rospy.Publisher('predicted_path', MarkerArray, queue_size=100)
         self.tf_listener = tf.TransformListener()
         self.history = deque(maxlen=max_obs_len)
         print('load model from '+model_path)
@@ -89,17 +90,23 @@ class Traj_pred:
                 pass
         obs_traj = np.array(obs_traj, dtype=float) # shape:(timestep, num_of_ppl, xy)
         # visualize previous trajectory
-        human_previous_path_deque = deque(maxlen=1000)
+        human_previous_path_array = MarkerArray()
         for i in range(0, obs_traj.shape[1]):# iterate through ppl
-            human_previous_path = Path()
+            human_previous_path = Marker()
+            human_previous_path.id = i
+            human_previous_path.scale = Vector3(0.1,0.1,0.1)
+            human_previous_path.type = Marker.LINE_STRIP
             human_previous_path.header.seq = i
             human_previous_path.header.stamp = rospy.Time.now()
             human_previous_path.header.frame_id = FIX_FRAME
-            traj = [PoseStamped(Header(),Pose(Point(loc[0],loc[1],0), Quaternion())) for loc in obs_traj[:,i,:]]# single person trajectory
-            human_previous_path.poses = traj
-            human_previous_path_deque.append(human_previous_path)
-        for path in human_previous_path_deque:
-            self.history_visualize_pub.publish(path)
+
+            traj = [Point(loc[0],loc[1],0) for loc in obs_traj[:,i,:]]
+            human_previous_path.points = traj
+            human_previous_path.colors = [ColorRGBA(0,1,0,1)]*len(traj)
+            
+            human_previous_path.lifetime = rospy.Duration.from_sec(0.3)
+            human_previous_path_array.markers.append(human_previous_path)
+        self.history_visualize_pub.publish(human_previous_path_array)
         if obs_traj.shape[0]!=8:
             return
         obs_traj *= 10
@@ -125,16 +132,21 @@ class Traj_pred:
         human_obstacle_msg = ObstacleArrayMsg() 
         human_obstacle_msg.header.stamp = rospy.Time.now()
         human_obstacle_msg.header.frame_id = FIX_FRAME # CHANGE HERE: odom/map
-        human_predicted_path_deque = deque(maxlen=20)
+        human_predicted_path_array = MarkerArray()
         for i in range(num_of_ppl):
             # for visualize
-            human_predicted_path = Path()
-            human_previous_path.header.seq = i
+            human_predicted_path = Marker()
+            human_predicted_path.type = Marker.LINE_STRIP
+            human_predicted_path.scale = Vector3(0.1,0.1,0.1)
+            human_predicted_path.id = i
+            human_predicted_path.header.seq = i
             human_predicted_path.header.stamp = rospy.Time.now()
             human_predicted_path.header.frame_id = FIX_FRAME
-            traj = [PoseStamped(Header(),Pose(Point(loc[0],loc[1],0), Quaternion())) for loc in pred_traj_fake[:,i,:]]
-            human_predicted_path.poses = traj
-            human_predicted_path_deque.append(human_predicted_path)
+            traj = [Point(loc[0],loc[1],0) for loc in pred_traj_fake[:,i,:]]
+            human_predicted_path.points = traj
+            human_predicted_path.colors = [ColorRGBA(1,0,0,1)]*len(traj)
+            human_predicted_path.lifetime = rospy.Duration.from_sec(0.3)
+            human_predicted_path_array.markers.append(human_predicted_path)
             # for local planner
             human_obstacle = ObstacleMsg()
             human_obstacle.header.stamp = rospy.Time.now()
@@ -148,8 +160,7 @@ class Traj_pred:
                 human_obstacle.polygon.points[0].z = 1/15 #delta T
                 human_obstacle_msg.obstacles.append(human_obstacle)
         self.prediction_pub.publish(human_obstacle_msg)
-        for path in human_predicted_path_deque:
-            self.prediction_visualize_pub.publish(path)
+        self.prediction_visualize_pub.publish(human_predicted_path_array)
     
 def start_pred():
     rospy.init_node('zed_traj_pred', anonymous=True)

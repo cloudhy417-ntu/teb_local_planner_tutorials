@@ -5,8 +5,6 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
-        - /Path1
-        - /Path2
       Splitter Ratio: 0.605095983
     Tree Height: 562
   - Class: rviz/Selection
@@ -84,10 +82,7 @@ Visualization Manager:
           Marker Topic: /move_base/TebLocalPlannerROS/teb_markers
           Name: TebMarker
           Namespaces:
-            CircularObstacles: true
-            LineObstacles: true
-            PointObstacles: true
-            TebContainer: true
+            {}
           Queue Size: 100
           Value: true
         - Alpha: 1
@@ -268,56 +263,34 @@ Visualization Manager:
           Value: false
       Enabled: true
       Name: Robot
-    - Alpha: 1
-      Buffer Length: 20
-      Class: rviz/Path
-      Color: 255; 0; 0
-      Enabled: true
-      Head Diameter: 0.300000012
-      Head Length: 0.200000003
-      Length: 0.300000012
-      Line Style: Lines
-      Line Width: 0.0299999993
-      Name: Path
-      Offset:
-        X: 0
-        Y: 0
-        Z: 0
-      Pose Color: 255; 85; 255
-      Pose Style: None
-      Radius: 0.0299999993
-      Shaft Diameter: 0.100000001
-      Shaft Length: 0.100000001
-      Topic: /predicted_path
-      Unreliable: false
-      Value: true
-    - Alpha: 1
-      Buffer Length: 20
-      Class: rviz/Path
-      Color: 25; 255; 0
-      Enabled: true
-      Head Diameter: 0.300000012
-      Head Length: 0.200000003
-      Length: 0.300000012
-      Line Style: Lines
-      Line Width: 0.0299999993
-      Name: Path
-      Offset:
-        X: 0
-        Y: 0
-        Z: 0
-      Pose Color: 255; 85; 255
-      Pose Style: None
-      Radius: 0.0299999993
-      Shaft Diameter: 0.100000001
-      Shaft Length: 0.100000001
-      Topic: /previous_path
-      Unreliable: false
-      Value: true
     - Class: rviz/Marker
       Enabled: true
       Marker Topic: /visualization_marker
       Name: Marker
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /group_cluster
+      Name: MarkerArray
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /predicted_path
+      Name: MarkerArray
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /previous_path
+      Name: MarkerArray
       Namespaces:
         {}
       Queue Size: 100
