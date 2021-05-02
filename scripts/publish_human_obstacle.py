@@ -66,9 +66,9 @@ class HumanObstaclePublisher():
     self.stage_reset_pos.call()
     initial_pose = PoseWithCovarianceStamped()
     initial_pose.header.frame_id = '/map'
-    initial_pose.pose.pose.position.x = -5
-    initial_pose.pose.pose.position.y = -0
-    q = quaternion_from_euler(0,0,0)
+    initial_pose.pose.pose.position.x = -0
+    initial_pose.pose.pose.position.y = 3
+    q = quaternion_from_euler(0,0,-math.pi/2)
     initial_pose.pose.pose.orientation.z = q[2]
     initial_pose.pose.pose.orientation.w = q[3]
     self.amcl_reset_pos.publish(initial_pose)
@@ -106,25 +106,28 @@ class HumanObstaclePublisher():
 
 if __name__ == '__main__': 
   try:
-    rospy.init_node("test_obstacle_msg")
-    path = '/home/cloudhy/sgan/datasets/eth/test/biwi_eth.txt'
+    rospy.init_node("test_obstacle_msg", anonymous=True)
+    path = '/home/cloudhy/programs/sgan/datasets/eth/test/biwi_eth.txt'
     human_obstacle_publisher = HumanObstaclePublisher(path)
     sim_time_publisher = rospy.Publisher('/sim_time', Int64, queue_size=10)
+    trial_publisher = rospy.Publisher('/trial', Int64, queue_size=10)
     r = rospy.Rate(10)
     t0 = 750
     t = t0
     while not rospy.is_shutdown():
-      # sim_time_publisher.publish(t0)  
+      sim_time_publisher.publish(t)  
       human_obstacle_publisher.publish_obstacle_msg(t)
       print '\rTimeStep: {:05d}'.format(t),
       sys.stdout.flush()
       t += 1
-      if t > t0 + 210:
+      if t > t0 + 150:
         human_obstacle_publisher.reset_pos()
         t0 += 30
         t = t0
-        sim_time_publisher.publish(t0)
+        trial_publisher.publish(t0)
       r.sleep()
+      if t>12580:
+        rospy.signal_shutdown('finished playback')
   except rospy.ROSInterruptException:
     print("finished playback")
     pass
