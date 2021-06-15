@@ -37,7 +37,7 @@
 
 
 	<!--  ****** Maps *****  -->
-	<node name="map_server" pkg="map_server" type="map_server" args="$(find teb_local_planner_tutorials)/maps/empty_box13X9.yaml" output="screen">
+	<node name="map_server" pkg="map_server" type="map_server" args="$(find teb_local_planner_tutorials)/maps/empty_box22X16.yaml" output="screen">
                 <param name="frame_id" value="map"/>
 	</node>
 
@@ -47,9 +47,9 @@
  		<!-- We have a holonomic robot! Overwrite yaml config here! -->
                 <param name="odom_model_type"		value="omni"/>
    
-	        <param name="initial_pose_x"            value="-2"/>
-		<param name="initial_pose_y"            value="-3"/>
-		<param name="initial_pose_a"            value="0"/>
+	        <param name="initial_pose_x"            value="10.5"/>
+		<param name="initial_pose_y"            value="0.0"/>
+		<param name="initial_pose_a"            value="3.14"/>
 	</node>
 
 	  <!--  **************** Visualisation ****************  -->
