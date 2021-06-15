@@ -2,8 +2,8 @@ define laser ranger
 (
   sensor
   (
-    range_max 6.5
-    fov 58.0
+    range_max 50
+    fov 360.0
     samples 640
   )
   # generic model properties
@@ -15,7 +15,7 @@ define omnidir_robot position
 (
   pose [ 0.0 0.0 0.0 0.0 ]
 
-  odom_error [0.03 0.03 999999 999999 999999 0.02]
+  odom_error [0.00 0.00 999999 999999 999999 0.00]
 
   size [ 0.25 0.25 0.40 ]
   origin [ 0.0 0.0 0.0 0.0 ]

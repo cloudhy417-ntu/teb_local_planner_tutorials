@@ -18,7 +18,7 @@ from std_srvs.srv import Empty
 class Robot():
     def __init__(self):
         self.trial = -1
-        self.start_time = 780
+        self.start_time = 7320
         rospy.wait_for_service('/reset_positions')
         self.stage_reset_pos = rospy.ServiceProxy('/reset_positions', Empty)
         self.amcl_reset_pos = rospy.Publisher('/initialpose', PoseWithCovarianceStamped, queue_size=10)
@@ -29,15 +29,15 @@ class Robot():
         self.trial = trial.data
         if self.trial == self.start_time:
             self.start_time += 30
-            self.send_goal(0,-3,-math.pi/2)
+            self.send_goal(-10.5,0.0,math.pi)
 
     def reset_pos(self):
         self.stage_reset_pos.call()
         initial_pose = PoseWithCovarianceStamped()
         initial_pose.header.frame_id = '/map'
-        initial_pose.pose.pose.position.x = -0
-        initial_pose.pose.pose.position.y = 3
-        q = quaternion_from_euler(0,0,-math.pi/2)
+        initial_pose.pose.pose.position.x = 10.5
+        initial_pose.pose.pose.position.y = 0.0
+        q = quaternion_from_euler(0,0,math.pi)
         initial_pose.pose.pose.orientation.z = q[2]
         initial_pose.pose.pose.orientation.w = q[3]
         self.amcl_reset_pos.publish(initial_pose)
@@ -53,7 +53,7 @@ class Robot():
         goal.target_pose.pose.orientation.z = orientation[2]
         goal.target_pose.pose.orientation.w = orientation[3]
         self.client.send_goal(goal)
-        finished = self.client.wait_for_result(timeout = rospy.Duration(15.0))
+        finished = self.client.wait_for_result(timeout = rospy.Duration(35.0))
         t1 = rospy.Time.now()
         if finished:
             print('{} travelling time:{}.{}'.format(self.start_time-30, (t1-t0).secs, (t1-t0).nsecs))
