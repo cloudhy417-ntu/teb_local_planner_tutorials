@@ -4,7 +4,8 @@
 import sys
 import time
 import pathos.pools as pp
-import rospy, math, tf
+import rospy, math, tf, rospkg
+import yaml
 import numpy as np
 import pandas as pd
 from costmap_converter.msg import ObstacleArrayMsg, ObstacleMsg
@@ -41,8 +42,9 @@ def get_state(args):
   vy = y_1 - y_0
   return (x,y, vx,vy)
 class HumanObstaclePublisher():
-  def __init__(self, path):
-    raw_data = read_file(path)
+  def __init__(self, config):
+    self.config = config
+    raw_data = read_file(config['path'])
     dataframe = pd.DataFrame(raw_data, columns=['frame', 'id', 'x', 'y'])
     dataframe['frame'] = dataframe['frame'].astype(int)
     self.dataframe = dataframe.set_index('frame')
@@ -54,14 +56,17 @@ class HumanObstaclePublisher():
     self.p = pp.ProcessPool(8)
     rospy.wait_for_service('/reset_positions')
     self.stage_reset_pos = rospy.ServiceProxy('/reset_positions', Empty)
+    rospy.wait_for_service('/move_base/clear_costmaps')
+    self.clear_costmaps = rospy.ServiceProxy('/move_base/clear_costmaps', Empty)
     self.amcl_reset_pos = rospy.Publisher('/initialpose', PoseWithCovarianceStamped, queue_size=10)
   def reset_pos(self):
     self.stage_reset_pos.call()
+    self.clear_costmaps.call()
     initial_pose = PoseWithCovarianceStamped()
     initial_pose.header.frame_id = '/map'
-    initial_pose.pose.pose.position.x = 10.5
-    initial_pose.pose.pose.position.y = -0.0
-    q = quaternion_from_euler(0,0,math.pi)
+    initial_pose.pose.pose.position.x = self.config['start']['x']
+    initial_pose.pose.pose.position.y = self.config['start']['y']
+    q = quaternion_from_euler(0,0,self.config['start']['theta'])
     initial_pose.pose.pose.orientation.z = q[2]
     initial_pose.pose.pose.orientation.w = q[3]
     self.amcl_reset_pos.publish(initial_pose)
@@ -116,13 +121,18 @@ class HumanObstaclePublisher():
 if __name__ == '__main__': 
   try:
     rospy.init_node("test_obstacle_msg", anonymous=True)
+    # path = '/home/cloudhy/sgan/datasets/hotel/test/biwi_hotel.txt'
     # path = '/home/cloudhy/sgan/datasets/eth/test/biwi_eth.txt'
-    path = '/home/cloudhy/sgan/datasets/univ/test/students001.txt'
-    human_obstacle_publisher = HumanObstaclePublisher(path)
+    # path = '/home/cloudhy/sgan/datasets/univ/test/students001.txt'
+    rospack = rospkg.RosPack()
+    config_path = rospack.get_path('teb_local_planner_tutorials')+'/cfg/trial_cfg.yaml'
+    with open(config_path, 'r') as f:
+      config = yaml.load(f)
+    human_obstacle_publisher = HumanObstaclePublisher(config)
     sim_time_publisher = rospy.Publisher('/sim_time', Int64, queue_size=10)
     trial_publisher = rospy.Publisher('/trial', Int64, queue_size=10)
     r = rospy.Rate(10)
-    t0 = 0
+    t0 = config['start_time']-30
     t = t0
     while not rospy.is_shutdown():
       sim_time_publisher.publish(t)  
@@ -130,13 +140,13 @@ if __name__ == '__main__':
       print '\rTimeStep: {:05d}'.format(t),
       sys.stdout.flush()
       t += 1
-      if t > t0 + 350:
+      if t > t0 + int(config['trial_time']*10):
         human_obstacle_publisher.reset_pos()
         t0 += 30
         t = t0
         trial_publisher.publish(t0)
       r.sleep()
-      if t>12580:
+      if t>config['end_time']:
         rospy.signal_shutdown('finished playback')
   except rospy.ROSInterruptException:
     print("finished playback")

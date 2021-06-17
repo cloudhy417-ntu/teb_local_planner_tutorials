@@ -3,6 +3,7 @@
 # Author: franz.albers@tu-dortmund.de
 import sys
 import rospy, math, tf
+import rospkg, yaml
 import numpy as np
 import pandas as pd
 from costmap_converter.msg import ObstacleArrayMsg, ObstacleMsg
@@ -17,27 +18,34 @@ from std_srvs.srv import Empty
 
 class Robot():
     def __init__(self):
+        rospack = rospkg.RosPack()
+        config_path = rospack.get_path('teb_local_planner_tutorials')+'/cfg/trial_cfg.yaml'
+        with open(config_path, 'r') as f:
+            self.config = yaml.load(f)
         self.trial = -1
-        self.start_time = 7320
+        self.start_time = self.config['start_time']
         rospy.wait_for_service('/reset_positions')
         self.stage_reset_pos = rospy.ServiceProxy('/reset_positions', Empty)
         self.amcl_reset_pos = rospy.Publisher('/initialpose', PoseWithCovarianceStamped, queue_size=10)
         self.client = actionlib.SimpleActionClient('move_base',MoveBaseAction)
         self.sim_time_sub = rospy.Subscriber('trial', Int64, self.trialCB)
         self.client.wait_for_server()
+        rospy.wait_for_service('/move_base/clear_costmaps')
+        self.clear_costmaps = rospy.ServiceProxy('/move_base/clear_costmaps', Empty)
     def trialCB(self, trial):
         self.trial = trial.data
         if self.trial == self.start_time:
             self.start_time += 30
-            self.send_goal(-10.5,0.0,math.pi)
+            self.send_goal(self.config['goal']['x'],self.config['goal']['y'],self.config['goal']['theta'])
 
     def reset_pos(self):
         self.stage_reset_pos.call()
+        self.clear_costmaps.call()
         initial_pose = PoseWithCovarianceStamped()
         initial_pose.header.frame_id = '/map'
-        initial_pose.pose.pose.position.x = 10.5
-        initial_pose.pose.pose.position.y = 0.0
-        q = quaternion_from_euler(0,0,math.pi)
+        initial_pose.pose.pose.position.x = self.config['start']['x']
+        initial_pose.pose.pose.position.y = self.config['start']['y']
+        q = quaternion_from_euler(0,0,self.config['start']['theta'])
         initial_pose.pose.pose.orientation.z = q[2]
         initial_pose.pose.pose.orientation.w = q[3]
         self.amcl_reset_pos.publish(initial_pose)
@@ -53,7 +61,7 @@ class Robot():
         goal.target_pose.pose.orientation.z = orientation[2]
         goal.target_pose.pose.orientation.w = orientation[3]
         self.client.send_goal(goal)
-        finished = self.client.wait_for_result(timeout = rospy.Duration(35.0))
+        finished = self.client.wait_for_result(timeout = rospy.Duration(self.config['trial_time']))
         t1 = rospy.Time.now()
         if finished:
             print('{} travelling time:{}.{}'.format(self.start_time-30, (t1-t0).secs, (t1-t0).nsecs))
