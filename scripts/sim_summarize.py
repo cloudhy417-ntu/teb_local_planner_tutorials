@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import sys
 from os import path
+import threading
 from collections import OrderedDict
 import rospy
 import tf
@@ -16,8 +17,9 @@ class Summarizer():
         trial_sub = rospy.Subscriber('trial', Int64, self.trial_CB)
         move_base_sub = rospy.Subscriber('/move_base/status', GoalStatusArray, self.move_base_CB)
         self.listener = tf.TransformListener()
-        self.trial = 0
+        self.trial = -1
         self.move_base_status = None
+        self.mutex = threading.Lock()
         robot_pose_sub = message_filters.Subscriber('/base_pose_ground_truth', Odometry)
         obst_pose_sub = message_filters.Subscriber('/move_base/TebLocalPlannerROS/obstacles', ObstacleArrayMsg)
         ts = message_filters.ApproximateTimeSynchronizer([robot_pose_sub, obst_pose_sub], 10,0.05)
@@ -37,14 +39,22 @@ class Summarizer():
         robot_pose = robot_pose.pose.pose.position
         obstacles = [obstacle.polygon.points[0] for obstacle in obstacles.obstacles]
         move_base_status = [status.status for status in self.move_base_status.status_list]
-        if self.trial == 0 or self.trans==None:
+        if self.trial == -1 or self.trans==None:
             return
+        self.mutex.acquire()
         if self.trial in self.status_list.keys():
             self.status_list[self.trial] += [(move_base_status, robot_pose, obstacles, self.trans)]
         else:
             self.status_list[self.trial] = [(move_base_status, robot_pose, obstacles, self.trans)]
+        self.mutex.release()
 def summary():
-    name = 'eth_right2left4830.pkl'
+    import rospkg
+    import yaml
+    rospack = rospkg.RosPack()
+    config_path = rospack.get_path('teb_local_planner_tutorials')+'/cfg/trial_cfg.yaml'
+    with open(config_path, 'r') as f:
+        config = yaml.load(f, Loader=yaml.FullLoader)
+    name = config['record_path']
     while path.exists(name):
         name += '.1'
     with open(name, 'wb') as f:
