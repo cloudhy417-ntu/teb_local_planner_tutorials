@@ -17,6 +17,10 @@ class Summarizer():
         obst_pose_sub = message_filters.Subscriber('/move_base/TebLocalPlannerROS/obstacles', ObstacleArrayMsg)
         ts = message_filters.ApproximateTimeSynchronizer([robot_pose_sub, obst_pose_sub], 10,0.05)
         ts.registerCallback(self.pos_CB)
+        self.trial = -1
+        trial_sub = rospy.Subscriber('trial', Int64, self.trial_CB)
+    def trial_CB(self, trial):
+        self.trial = trial.data
     def pos_CB(self, robot_pose, obstacles):
         robot_pose = robot_pose.pose.pose.position
         min_dist = 100
@@ -25,7 +29,7 @@ class Summarizer():
             if dist<min_dist:
                 min_dist = dist
         if min_dist < 0.35:
-            print '\rCOLLISION: {:05f}'.format(min_dist),
+            print '\n{:5d}COLLISION: {:05f}'.format(self.trial,min_dist),
             sys.stdout.flush()
         else:
             print '\rmin_dist: {:05f}'.format(min_dist),
