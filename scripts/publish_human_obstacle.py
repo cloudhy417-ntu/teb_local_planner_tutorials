@@ -9,15 +9,17 @@ import yaml
 import numpy as np
 import pandas as pd
 from costmap_converter.msg import ObstacleArrayMsg, ObstacleMsg
+from actionlib_msgs.msg import GoalStatusArray
 from std_msgs.msg import Header, ColorRGBA, Int64
 from geometry_msgs.msg import PoseWithCovarianceStamped, PolygonStamped, Point32, QuaternionStamped, Quaternion, TwistWithCovariance, Pose, Point, Vector3
 from tf.transformations import quaternion_from_euler
 from visualization_msgs.msg import Marker, MarkerArray
+from jsk_recognition_msgs.msg import PolygonArray
 
 import actionlib
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from std_srvs.srv import Empty
-
+from std_msgs.msg import Bool
 def read_file(_path, delim='\t'):
     data = []
     if delim == 'tab':
@@ -35,11 +37,11 @@ def get_state(args):
   x_0 = dataframe.loc[[time_0]].loc[dataframe.loc[[time_0]].id==id].x.values[0]
   x_1 = dataframe.loc[[time_1]].loc[dataframe.loc[[time_1]].id==id].x.values[0]
   x = x_1*(t-time_0)/10 + x_0*(10-(t-time_0))/10
-  vx = x_1 - x_0
+  vx = 0.0 #x_1 - x_0
   y_0 = dataframe.loc[[time_0]].loc[dataframe.loc[[time_0]].id==id].y.values[0]
   y_1 = dataframe.loc[[time_1]].loc[dataframe.loc[[time_1]].id==id].y.values[0]
   y = y_1*(t-time_0)/10 + y_0*(10-(t-time_0))/10
-  vy = y_1 - y_0
+  vy = 0.0 #y_1 - y_0
   return (x,y, vx,vy)
 class HumanObstaclePublisher():
   def __init__(self, config):
@@ -52,6 +54,10 @@ class HumanObstaclePublisher():
     self.dataframe.y -=dataframe.y.mean()
     self.obstacle_publisher = rospy.Publisher('/move_base/TebLocalPlannerROS/obstacles', ObstacleArrayMsg, queue_size=1)
     self.marker_publisher = rospy.Publisher('visualization_marker', MarkerArray, queue_size=100)
+    self.local_human_group_publisher = rospy.Publisher('/move_base/local_costmap/humangrouplayer/human_group', PolygonArray, queue_size=1)
+    self.global_human_group_publisher = rospy.Publisher('/move_base/global_costmap/humangrouplayer/human_group', PolygonArray, queue_size=1)
+    self.finish_sub = rospy.Subscriber('/finished', Bool, self.finish_CB)
+    self.goal = False
     self.time = 0
     self.p = pp.ProcessPool(8)
     rospy.wait_for_service('/reset_positions')
@@ -59,7 +65,10 @@ class HumanObstaclePublisher():
     rospy.wait_for_service('/move_base/clear_costmaps')
     self.clear_costmaps = rospy.ServiceProxy('/move_base/clear_costmaps', Empty)
     self.amcl_reset_pos = rospy.Publisher('/initialpose', PoseWithCovarianceStamped, queue_size=10)
+  def finish_CB(self, move_base_status):
+    self.goal = move_base_status.data
   def reset_pos(self):
+    self.goal = False
     self.stage_reset_pos.call()
     self.clear_costmaps.call()
     initial_pose = PoseWithCovarianceStamped()
@@ -76,13 +85,22 @@ class HumanObstaclePublisher():
     obstacle_msg = ObstacleArrayMsg() 
     obstacle_msg.header.frame_id = '/map'
     obstacle_msg.header.stamp = rospy.Time.now()
+    individual_polygons = PolygonArray()
+    individual_polygons.header.frame_id = '/map'
+    individual_polygons.header.stamp = rospy.Time.now()
     marker_msg = MarkerArray()
     ppl_tuple = self.get_ppl_loc(t)
     if ppl_tuple is None:
       self.obstacle_publisher.publish(obstacle_msg)
+      self.local_human_group_publisher.publish(individual_polygons)
+      self.global_human_group_publisher.publish(individual_polygons)
       return
     for id, state in ppl_tuple:
       obst = ObstacleMsg()
+      individual_polygon = PolygonStamped()
+      individual_polygon.polygon.points = [Point32(x=state[0]+0.2, y=state[1]), Point32(x=state[0], y=state[1]+0.2), 
+                                           Point32(x=state[0]-0.2, y=state[1]), Point32(x=state[0], y=state[1]-0.2)]
+      individual_polygons.polygons.append(individual_polygon)
       obst.header.frame_id='map'
       obst.id = id
       obst.radius = radius
@@ -104,6 +122,9 @@ class HumanObstaclePublisher():
       marker_msg.markers.append(marker)
     self.marker_publisher.publish(marker_msg)
     self.obstacle_publisher.publish(obstacle_msg)
+    self.local_human_group_publisher.publish(individual_polygons)
+    self.global_human_group_publisher.publish(individual_polygons)
+        
   def get_ppl_loc(self,t):
     interval = 10
     time_0 = t//10 * 10
@@ -114,20 +135,16 @@ class HumanObstaclePublisher():
     ppl_set_1 = set(self.dataframe.loc[[time_1]].id.values)
     ppl_set_intersection = list(ppl_set_0.intersection(ppl_set_1))
     return_dict = {}
-    # p = pp.ProcessPool(8)
     return_list = self.p.map(get_state, [(self.dataframe, id, t, time_0, time_1) for id in ppl_set_intersection])
     return_tuple = zip(ppl_set_intersection, return_list)
     return return_tuple
 if __name__ == '__main__': 
   try:
     rospy.init_node("test_obstacle_msg", anonymous=True)
-    # path = '/home/cloudhy/sgan/datasets/hotel/test/biwi_hotel.txt'
-    # path = '/home/cloudhy/sgan/datasets/eth/test/biwi_eth.txt'
-    # path = '/home/cloudhy/sgan/datasets/univ/test/students001.txt'
     rospack = rospkg.RosPack()
     config_path = rospack.get_path('teb_local_planner_tutorials')+'/cfg/trial_cfg.yaml'
     with open(config_path, 'r') as f:
-      config = yaml.load(f)
+      config = yaml.load(f, Loader=yaml.FullLoader)
     human_obstacle_publisher = HumanObstaclePublisher(config)
     sim_time_publisher = rospy.Publisher('/sim_time', Int64, queue_size=10)
     trial_publisher = rospy.Publisher('/trial', Int64, queue_size=10)
@@ -140,7 +157,7 @@ if __name__ == '__main__':
       print '\rTimeStep: {:05d}'.format(t),
       sys.stdout.flush()
       t += 1
-      if t > t0 + int(config['trial_time']*10):
+      if t > t0 + int(config['trial_time']*10) or human_obstacle_publisher.goal:
         human_obstacle_publisher.reset_pos()
         t0 += 30
         t = t0
@@ -151,5 +168,4 @@ if __name__ == '__main__':
   except rospy.ROSInterruptException:
     print("finished playback")
     pass
-# demo scenerio 4236
 

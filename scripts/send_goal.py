@@ -15,18 +15,19 @@ from visualization_msgs.msg import Marker
 import actionlib
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from std_srvs.srv import Empty
-
+from std_msgs.msg import Bool
 class Robot():
     def __init__(self):
         rospack = rospkg.RosPack()
         config_path = rospack.get_path('teb_local_planner_tutorials')+'/cfg/trial_cfg.yaml'
         with open(config_path, 'r') as f:
-            self.config = yaml.load(f)
+            self.config = yaml.load(f, Loader=yaml.FullLoader)
         self.trial = -1
         self.start_time = self.config['start_time']
         rospy.wait_for_service('/reset_positions')
         self.stage_reset_pos = rospy.ServiceProxy('/reset_positions', Empty)
         self.amcl_reset_pos = rospy.Publisher('/initialpose', PoseWithCovarianceStamped, queue_size=10)
+        self.finish_pub = rospy.Publisher('finished', Bool, queue_size=10)
         self.client = actionlib.SimpleActionClient('move_base',MoveBaseAction)
         self.sim_time_sub = rospy.Subscriber('trial', Int64, self.trialCB)
         self.client.wait_for_server()
@@ -61,9 +62,11 @@ class Robot():
         goal.target_pose.pose.orientation.z = orientation[2]
         goal.target_pose.pose.orientation.w = orientation[3]
         self.client.send_goal(goal)
-        finished = self.client.wait_for_result(timeout = rospy.Duration(self.config['trial_time']))
+        self.client.wait_for_result(timeout = rospy.Duration(self.config['trial_time']))
+        result = self.client.get_result()
         t1 = rospy.Time.now()
-        if finished:
+        if result:
+            self.finish_pub.publish(Bool(True))
             print('{} travelling time:{}.{}'.format(self.start_time-30, (t1-t0).secs, (t1-t0).nsecs))
         else:
             print('{} timed out'.format(self.start_time-30))
