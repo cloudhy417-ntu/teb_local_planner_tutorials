@@ -58,6 +58,10 @@ class MPDM:
             velx = human.velocities.twist.linear.x
             vely = human.velocities.twist.linear.y
             vel = math.sqrt(math.pow(velx,2) + math.pow(vely,2))
+            individual_polygon = PolygonStamped()
+            individual_polygon.polygon.points = [Point32(x=x+0.2, y=y), Point32(x=x, y=y+0.2), 
+                                                 Point32(x=x-0.2, y=y), Point32(x=x, y=y-0.2)]
+            group_polygons.polygons.append(individual_polygon)  
             if vel != 0:
                 humanArr.append([x,y,velx/vel, vely/vel])
             else:

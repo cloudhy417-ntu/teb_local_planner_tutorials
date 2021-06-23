@@ -3,8 +3,8 @@ TebLocalPlannerROS:
  # Trajectory
   
  teb_autosize: True
- dt_ref: 0.3
- dt_hysteresis: 0.1
+ dt_ref: 0.2
+ dt_hysteresis: 0.02
  max_samples: 500
  global_plan_overwrite_orientation: True
  allow_init_with_backwards_motion: False
@@ -12,7 +12,7 @@ TebLocalPlannerROS:
  global_plan_viapoint_sep: -1
  global_plan_prune_distance: 1
  exact_arc_length: True
- feasibility_check_no_poses: 5
+ feasibility_check_no_poses: 3
  publish_feedback: False
  visualize_with_time_as_z_axis_scale: 0.1
  # Robot
@@ -47,7 +47,7 @@ TebLocalPlannerROS:
  obstacle_poses_affected: 15
  costmap_converter_plugin: "costmap_converter::CostmapToLinesDBSRANSAC"
  costmap_converter_spin_thread: True
- costmap_converter_rate: 20
+ costmap_converter_rate: 10
 
  # Optimization
     
@@ -70,7 +70,7 @@ TebLocalPlannerROS:
  weight_shortest_path: 0
  weight_obstacle: 100
  weight_inflation: 0.2
- weight_dynamic_obstacle: 100
+ weight_dynamic_obstacle: 50.0
  weight_dynamic_obstacle_inflation: 0.2
  weight_human_obstacle: 100
  weight_human_obstacle_inflation: 0.2
@@ -81,7 +81,7 @@ TebLocalPlannerROS:
 
  enable_homotopy_class_planning: True
  enable_multithreading: True
- max_number_classes: 4
+ max_number_classes: 10
  selection_cost_hysteresis: 1.0
  selection_prefer_initial_plan: 0.9
  selection_obst_cost_scale: 1.0

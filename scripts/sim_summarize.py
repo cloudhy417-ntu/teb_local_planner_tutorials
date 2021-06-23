@@ -3,6 +3,8 @@ import sys
 from os import path
 import threading
 from collections import OrderedDict
+import rospkg
+import yaml
 import rospy
 import tf
 import pickle
@@ -48,8 +50,6 @@ class Summarizer():
             self.status_list[self.trial] = [(move_base_status, robot_pose, obstacles, self.trans)]
         self.mutex.release()
 def summary():
-    import rospkg
-    import yaml
     rospack = rospkg.RosPack()
     config_path = rospack.get_path('teb_local_planner_tutorials')+'/cfg/trial_cfg.yaml'
     with open(config_path, 'r') as f:
