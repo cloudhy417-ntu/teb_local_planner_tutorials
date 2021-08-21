@@ -31,14 +31,14 @@ window
 floorplan
 (
   name "empty_box"
-  bitmap "../maps/empty_box22X16.png"
-  size [ 22.0 16.0 2.0 ]
+  bitmap "../maps/empty_box_univ1_20X18.png"
+  size [ 20.0 18.0 2.0 ]
   pose [ 0.0 0.0 0.0 0.0 ]
 )
 
 # throw in a robot
 omnidir_robot
 (
-  pose [ 10.5 -0.0 0.0 180]
+  pose [ 0.0 -8.5 0.0 90]
   name "robot"
 )
