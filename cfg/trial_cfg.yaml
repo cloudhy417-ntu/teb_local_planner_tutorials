@@ -1,13 +1,13 @@
 start:
-  x: 0.0
-  y: -5.5
-  theta: 1.57
+  x: 10.5
+  y: 0.0
+  theta: 3.14
 goal:
-  x: 0.0
-  y: 5.5
-  theta: 1.57
+  x: -10.5
+  y: 0.0
+  theta: 3.14
 start_time: 0
 end_time: 10520
-trial_time: 20.0
-path: '/home/cloudhy/sgan/datasets/zara2/test/crowds_zara02.txt'
+trial_time: 30.0
+path: '/home/cloudhy/programs/sgan/datasets/univ/test/students001.txt'
 record_path: "/home/cloudhy/catkin_ws/src/teb_local_planner_tutorials/scripts/records/teb/zara2_bot2top.pkl"
